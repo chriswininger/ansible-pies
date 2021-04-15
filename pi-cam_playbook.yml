@@ -1,0 +1,117 @@
+-
+  hosts: pi-cams
+
+  vars_files:
+    - secrets.yml
+
+  tasks:
+    - name: Install packages
+      become: true
+      apt:
+        pkg:
+          - motion # this is the program that monitors the camera
+          - vim
+          - wget
+          - git
+          - libatomic1 # needed for node
+    - name: Download node
+      get_url:
+        url: https://nodejs.org/dist/v14.16.1/node-v14.16.1-linux-armv7l.tar.xz
+        dest: ~/node-v14.16.1-linux-armv7l.tar.xz
+    - name: Unzip node download
+      ansible.builtin.unarchive:
+        src: ~/node-v14.16.1-linux-armv7l.tar.xz
+        dest: ~/
+        remote_src: true
+    - name: 'Copy node binaries to /usr/local' # using shell because copy does not include symlinks
+      become: true
+      shell: 'cp -R /home/chris/node-v14.16.1-linux-armv7l/* /usr/local/'
+      args:
+        creates: '/usr/local/bin/node'
+    - name: Set hostname # will need to update this to vary by server instance
+      become: true
+      copy:
+        dest: /etc/hostname
+        content: "pi-cam-1\n" # update this to possibly look up from dictionary by host address
+    - name: Backup monction.conf
+      become: true
+      copy:
+        src: /etc/motion/motion.conf
+        dest: /etc/motion/motion.conf.bk
+        remote_src: true
+        force: false
+    - name: Backup motion
+      become: true
+      copy:
+        src: /etc/default/motion
+        dest: /etc/default/motion.bk
+        remote_src: true
+        force: false
+    - name: motion.conf -> daemon on
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^daemon off'
+        line: daemon on
+    - name: motion.conf -> framerate -> 100
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^framerate .*'
+        line: framerate 100
+    - name: motion.conf -> mmalcam_name -> vc.ril.camera
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^[;] mmalcam_name value'
+        line: '; mmalcam_name vc.ril.camera'
+    - name: motion.conf -> set ; mmalcam_control_params => -hf
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^[;] mmalcam_control_params value'
+        line: '; mmalcam_control_params -hf'
+    - name: motion.conf -> picture_output => on
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^picture_output .*'
+        line: 'picture_output best'
+    - name: motion.conf -> movie_output => off
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^movie_output on'
+        line: 'movie_output off'
+    - name: motion.conf -> stream_localhost => off
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^stream_localhost on'
+        line: 'stream_localhost off'
+    - name: motion -> start_motion_daemon => yes
+      become: true
+      ansible.builtin.lineinfile:
+        path: /etc/default/motion
+        regex: '^start_motion_daemon=.*'
+        line: 'start_motion_daemon=yes'
+    - name: Copy our custom application installer
+      copy:
+        src: ./files/dl.sh
+        dest: ~/dl.sh
+        mode: a+x
+    - name: run our custom executable # no creates, lets do this every time... for now at least
+      shell: '~/dl.sh'
+    - name: Set our snapshop scopy script to run via cron
+      become: true
+      cron:
+        name: "move snapshopts from motion to s3"
+        minute: "*/15"
+        job: 'AWS_ACCESS_KEY_ID={{AWS_ACCESS_KEY_ID}} AWS_ACCESS_KEY_SECRET={{AWS_ACCESS_KEY_SECRET}} /usr/local/bin/node /home/chris/live-cam/scripts/transfer-images-to-s3/transfer-images-to-s3.js /var/lib/motion --delete'
+    - name: Reboot at 2AM every night
+      become: true
+      cron:
+        name: "reboot at 2am every night"
+        minute: "0"
+        hour: "2"
+        job: '/usr/sbin/reboot -h now'

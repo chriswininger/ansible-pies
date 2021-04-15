@@ -1,0 +1,6 @@
+[pi-cams]
+192.168.1.13
+
+[pi-cams:vars]
+ansible_port=1027
+user=chris
