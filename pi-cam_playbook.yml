@@ -32,7 +32,7 @@
       become: true
       copy:
         dest: /etc/hostname
-        content: "pi-cam-1\n" # update this to possibly look up from dictionary by host address
+        content: "pi-cam-{{groups['pi-cams'].index(inventory_hostname)}}\n" # update this to possibly look up from dictionary by host address
     - name: Backup monction.conf
       become: true
       copy:
@@ -89,6 +89,12 @@
         path: /etc/motion/motion.conf
         regex: '^stream_localhost on'
         line: 'stream_localhost off'
+    - name: motion.conf -> stream_maxrate > 100
+      become: true
+      lineinfile:
+        path: /etc/motion/motion.conf
+        regex: '^stream_maxrate .*'
+        line: 'stream_maxrate 100'
     - name: motion -> start_motion_daemon => yes
       become: true
       ansible.builtin.lineinfile:
@@ -100,8 +106,10 @@
         src: ./files/dl.sh
         dest: ~/dl.sh
         mode: a+x
-    - name: run our custom executable # no creates, lets do this every time... for now at least
+    - name: run our custom executable
       shell: '~/dl.sh'
+      args:
+        creates: '/home/chris/README.md'
     - name: Set our snapshop scopy script to run via cron
       become: true
       cron:
