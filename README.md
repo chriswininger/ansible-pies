@@ -14,7 +14,18 @@ gzip -dc /media/chris/bigdata/Downloads/linux\ images/my\ pi\ base\ images/pi-ba
 
 ## Running
 
-Pay attention to what is in hosts file here and make sure you are targeting the right pi/pis
+This is not fully generalized to deploy to all cameras, so
+
+* !!! Update hosts file and make sure you are targeting the right pi/pis
+* Update this block in the playbook to set the desired hostname
+  ```
+      - name: Set hostname # will need to update this to vary by server instance
+      become: true
+      copy:
+        dest: /etc/hostname
+        content: "pi-cam-1\n" # update this to possibly look up from dictionary by host address
+  ```
+* Create your secrets file from the example
 
 ```
 ansible-playbook -K ./pi-cam_playbook.yml
