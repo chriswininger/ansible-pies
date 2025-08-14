@@ -14,6 +14,8 @@ gzip -dc /media/chris/bigdata/Downloads/linux\ images/my\ pi\ base\ images/pi-ba
 
 ## Running
 
+Pay attention to what is in hosts file here and make sure you are targeting the right pi/pis
+
 ```
 ansible-playbook -K ./pi-cam_playbook.yml
 ```
